@@ -4,11 +4,35 @@ const pool = require("../db/connection");
 // =========================================
 // GENERAR SORTEO
 // =========================================
+// =========================================
+// PREVIEW SORTEO
+// =========================================
 
-const generarSorteo = async (req, res, next) => {
+const previewSorteo = async (req, res, next) => {
+
   try {
 
-    // Obtener equipos
+    const { cantidadGrupos } = req.body;
+
+
+    // =====================================
+    // VALIDAR CANTIDAD
+    // =====================================
+
+    if (!cantidadGrupos || cantidadGrupos <= 1) {
+
+      return res.status(400).json({
+        ok: false,
+        mensaje:
+          "La cantidad de grupos debe ser mayor a 1"
+      });
+
+    }
+
+
+    // =====================================
+    // EQUIPOS
+    // =====================================
 
     const equiposDB = await pool.query(
       `
@@ -16,52 +40,249 @@ const generarSorteo = async (req, res, next) => {
       `
     );
 
-    // Obtener grupos
+
+    // =====================================
+    // GRUPOS
+    // =====================================
 
     const gruposDB = await pool.query(
       `
       SELECT * FROM grupos
       ORDER BY id ASC
-      `
+      LIMIT $1
+      `,
+      [cantidadGrupos]
     );
+
 
     const equipos = equiposDB.rows;
 
     const grupos = gruposDB.rows;
 
-    // Validaciones
+
+    // =====================================
+    // VALIDACIONES
+    // =====================================
 
     if (equipos.length === 0) {
+
       return res.status(400).json({
         ok: false,
         mensaje: "No hay equipos registrados"
       });
+
     }
 
-    if (grupos.length === 0) {
+
+    if (grupos.length < cantidadGrupos) {
+
       return res.status(400).json({
         ok: false,
-        mensaje: "No hay grupos registrados"
+        mensaje:
+          "No existen suficientes grupos registrados"
       });
+
     }
 
-    // Validar divisibilidad
 
     if (equipos.length % grupos.length !== 0) {
+
       return res.status(400).json({
         ok: false,
         mensaje:
           "La cantidad de equipos no puede dividirse exactamente entre grupos"
       });
+
     }
 
-    // Mezclar aleatoriamente
+
+    // =====================================
+    // MEZCLAR
+    // =====================================
 
     const equiposMezclados = [...equipos].sort(
       () => Math.random() - 0.5
     );
 
-    // Crear nueva distribución
+
+    // =====================================
+    // ARMAR PREVIEW
+    // =====================================
+
+    const equiposPorGrupo =
+      equipos.length / grupos.length;
+
+
+    let indexEquipo = 0;
+
+    const resultado = [];
+
+
+    for (const grupo of grupos) {
+
+      const grupoActual = {
+
+        grupo: grupo.nombre,
+
+        equipos: []
+
+      };
+
+
+      for (let i = 0; i < equiposPorGrupo; i++) {
+
+        const equipo =
+          equiposMezclados[indexEquipo];
+
+        grupoActual.equipos.push(
+          equipo.nombre_pais
+        );
+
+        indexEquipo++;
+
+      }
+
+      resultado.push(grupoActual);
+
+    }
+
+
+    // =====================================
+    // RESPUESTA
+    // =====================================
+
+    res.status(200).json({
+
+      ok: true,
+
+      mensaje: "Vista previa generada",
+
+      data: resultado
+
+    });
+
+  } catch (error) {
+
+    next(error);
+
+  }
+
+};
+
+const generarSorteo = async (req, res, next) => {
+
+  try {
+
+    const { cantidadGrupos } = req.body;
+
+
+    // =====================================
+    // VALIDAR CANTIDAD GRUPOS
+    // =====================================
+
+    if (!cantidadGrupos || cantidadGrupos <= 1) {
+
+      return res.status(400).json({
+        ok: false,
+        mensaje:
+          "La cantidad de grupos debe ser mayor a 1"
+      });
+
+    }
+
+
+    // =====================================
+    // OBTENER EQUIPOS
+    // =====================================
+
+    const equiposDB = await pool.query(
+      `
+      SELECT * FROM equipos
+      `
+    );
+
+
+    // =====================================
+    // OBTENER GRUPOS
+    // =====================================
+
+    const gruposDB = await pool.query(
+      `
+      SELECT * FROM grupos
+      ORDER BY id ASC
+      LIMIT $1
+      `,
+      [cantidadGrupos]
+    );
+
+
+    const equipos = equiposDB.rows;
+
+    const grupos = gruposDB.rows;
+
+
+    // =====================================
+    // VALIDACIONES
+    // =====================================
+
+    if (equipos.length === 0) {
+
+      return res.status(400).json({
+        ok: false,
+        mensaje: "No hay equipos registrados"
+      });
+
+    }
+
+
+    if (grupos.length === 0) {
+
+      return res.status(400).json({
+        ok: false,
+        mensaje: "No hay grupos registrados"
+      });
+
+    }
+
+
+    // Validar grupos suficientes
+
+    if (grupos.length < cantidadGrupos) {
+
+      return res.status(400).json({
+        ok: false,
+        mensaje:
+          "No existen suficientes grupos registrados"
+      });
+
+    }
+
+
+    // Validar divisibilidad
+
+    if (equipos.length % grupos.length !== 0) {
+
+      return res.status(400).json({
+        ok: false,
+        mensaje:
+          "La cantidad de equipos no puede dividirse exactamente entre grupos"
+      });
+
+    }
+
+
+    // =====================================
+    // MEZCLAR EQUIPOS
+    // =====================================
+
+    const equiposMezclados = [...equipos].sort(
+      () => Math.random() - 0.5
+    );
+
+
+    // =====================================
+    // CREAR DISTRIBUCIÓN
+    // =====================================
 
     const nuevaDistribucion = await pool.query(
       `
@@ -71,31 +292,44 @@ const generarSorteo = async (req, res, next) => {
       `
     );
 
+
     const distribucionId =
       nuevaDistribucion.rows[0].id;
 
-    // Cantidad por grupo
+
+    // =====================================
+    // CANTIDAD POR GRUPO
+    // =====================================
 
     const equiposPorGrupo =
       equipos.length / grupos.length;
+
 
     let indexEquipo = 0;
 
     const resultado = [];
 
-    // Repartir equipos
+
+    // =====================================
+    // REPARTIR EQUIPOS
+    // =====================================
 
     for (const grupo of grupos) {
 
       const grupoActual = {
+
         grupo: grupo.nombre,
+
         equipos: []
+
       };
+
 
       for (let i = 0; i < equiposPorGrupo; i++) {
 
         const equipo =
           equiposMezclados[indexEquipo];
+
 
         // Guardar relación
 
@@ -116,23 +350,40 @@ const generarSorteo = async (req, res, next) => {
           ]
         );
 
+
         grupoActual.equipos.push(
           equipo.nombre_pais
         );
 
+
         indexEquipo++;
+
       }
+
 
       resultado.push(grupoActual);
+
     }
 
+
+    // =====================================
+    // RESPUESTA
+    // =====================================
+
     res.status(200).json({
+
       ok: true,
+
       mensaje: "Sorteo generado correctamente",
+
       data: {
+
         distribucion_id: distribucionId,
+
         grupos: resultado
+
       }
+
     });
 
   } catch (error) {
@@ -140,8 +391,8 @@ const generarSorteo = async (req, res, next) => {
     next(error);
 
   }
-};
 
+};
 
 // =========================================
 // OBTENER TODOS LOS SORTEOS
@@ -242,6 +493,7 @@ const obtenerSorteoPorId = async (req, res, next) => {
 
 
 module.exports = {
+  previewSorteo,
   generarSorteo,
   obtenerSorteos,
   obtenerSorteoPorId

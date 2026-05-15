@@ -3,11 +3,15 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  previewSorteo,
   generarSorteo,
   obtenerSorteos,
   obtenerSorteoPorId
 } = require("../controllers/sorteos.controller");
 
+// Preview sorteo
+
+router.post("/preview", previewSorteo);
 
 // Generar sorteo
 

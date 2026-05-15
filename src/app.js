@@ -2,48 +2,69 @@ const express = require("express");
 
 const cors = require("cors");
 
-const equiposRoutes = require("./routes/equipos.routes");
+const equiposRoutes =
+  require("./routes/equipos.routes");
 
-const sorteosRoutes = require("./routes/sorteos.routes");
+const gruposRoutes =
+  require("./routes/grupos.routes");
 
-const notFoundMiddleware = require("./middlewares/notFound.middleware");
+const sorteosRoutes =
+  require("./routes/sorteos.routes");
 
-const errorMiddleware = require("./middlewares/error.middleware");
+const notFoundMiddleware =
+  require("./middlewares/notFound.middleware");
+
+const errorMiddleware =
+  require("./middlewares/error.middleware");
 
 
 const app = express();
 
 
-// Middlewares
+// =====================================
+// MIDDLEWARES
+// =====================================
 
 app.use(cors());
 
 app.use(express.json());
 
 
-// Ruta raíz
+// =====================================
+// RUTA RAÍZ
+// =====================================
 
 app.get("/", (req, res) => {
+
   res.status(200).json({
     ok: true,
     mensaje: "API Mundial funcionando correctamente"
   });
+
 });
 
 
-// Rutas
+// =====================================
+// RUTAS
+// =====================================
 
 app.use("/equipos", equiposRoutes);
+
+app.use("/grupos", gruposRoutes);
 
 app.use("/sorteos", sorteosRoutes);
 
 
-// Ruta no encontrada
+// =====================================
+// RUTA NO ENCONTRADA
+// =====================================
 
 app.use(notFoundMiddleware);
 
 
-// Manejo global de errores
+// =====================================
+// MANEJO GLOBAL ERRORES
+// =====================================
 
 app.use(errorMiddleware);
 
